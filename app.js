@@ -587,7 +587,7 @@ Object.assign(UI_TRANSLATIONS_EN,{
   'El texto se eliminará. Los archivos adjuntos quedarán conservados en el historial de la solicitud.':'The text will be deleted. Attachments will remain in the request history.'
 })
 
-const BUILD_VERSION='17.22.1'
+const BUILD_VERSION='17.22.2'
 try{document.documentElement.dataset.appVersion=BUILD_VERSION}catch{}
 const I18N_TEXT_ORIGINAL = new WeakMap()
 const I18N_ATTR_ORIGINAL = new WeakMap()

@@ -1,0 +1,73 @@
+PASS  Version 17.22.2
+PASS  Index points to 17.22.2 assets
+PASS  Generic app/css copies match versioned build
+PASS  JSX parses with TypeScript parser
+PASS  CSS braces balanced
+PASS  No merge markers
+PASS  Own Helpdesk collection exists
+PASS  Requester portal receives only own Helpdesk
+PASS  Requester sidebar receives only own Helpdesk
+PASS  Requester sidebar ignores workspace-wide Helpdesk counter
+PASS  Mentioned Helpdesk remains based on mention rows
+PASS  Mentioned requested tab remains own-only
+PASS  Ownership scenario excludes mentioned third-party request
+PASS  Portal private info banner removed
+PASS  Create Storage implementation banner removed
+PASS  Portal routing implementation banner removed
+PASS  Comment Storage implementation banner removed
+PASS  Assignment process notice removed
+PASS  AI fallback implementation notice removed
+PASS  Staff subtle routing callout removed
+PASS  SMTP Test production alert removed from UI
+PASS  Workspace summary is not rendered as notice
+PASS  Critical runtime errors remain visible
+PASS  Audit activity JSX uses item class
+PASS  Audit activity item has concrete layout styles
+PASS  Audit activity metadata styled
+PASS  Audit filters match JSX class
+PASS  Audit session row matches JSX class
+PASS  Audit session icon styled
+PASS  Audit summary vertical rhythm restored
+PASS  Audit detail modal has real padding
+PASS  Audit detail footer has horizontal padding
+PASS  Audit dark cards override exists
+PASS  Audit dark filter contrast exists
+PASS  Audit dark event contrast exists
+PASS  Portal type cards dark contrast exists
+PASS  Request description dark contrast exists
+PASS  Workspace inline dark contrast exists
+PASS  Mobile Audit filters collapse to one column
+PASS  Mobile audit event hides chevron at narrow width
+PASS  Mobile portal category cards collapse
+PASS  Module still present: StaffRolesView
+PASS  Module still present: SettingsView
+PASS  Module still present: WorkspaceSettings
+PASS  Module still present: HelpdeskSettings
+PASS  Module still present: NotificationSettings
+PASS  Module still present: Toggle
+PASS  Module still present: EntitySettings
+PASS  Staff route still renders
+PASS  Staff update still uses Edge function
+PASS  Staff removal still uses Edge function
+PASS  Realtime audit channel preserved
+PASS  Helpdesk Realtime data source preserved
+PASS  Audit policy icon uses known timer icon
+PASS  Audit policy icon light style exists
+PASS  Audit policy icon dark contrast exists
+PASS  Out today badge is intrinsic width
+PASS  Out today badge never wraps
+PASS  Out today label remains visible at <=820px
+PASS  Header has 3-digit away-count responsive breakpoints
+PASS  Away badge labels support 1-3 digit counts
+PASS  Header reserves max-content actions before flexible search
+PASS  Search can shrink without overflowing grid
+PASS  Portal context has dark mode surface
+PASS  Portal title has dark mode text contrast
+PASS  Portal subtitle has dark mode text contrast
+PASS  Header has pre-collision 1540 breakpoint
+PASS  Header hides user text before narrow layout
+PASS  Header hides search shortcut before collision
+PASS  Header suppresses live label before mobile collapse
+PASS  Portal/search hide only at mobile breakpoint
+
+71 passed · 0 failed
