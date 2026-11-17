@@ -1,11 +1,11 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.22.0",
-  "description": "Jira Interno TROBBU v17.22.0 - production UI stabilization, requester ownership and compact distribution",
+  "version": "17.22.1",
+  "description": "Jira Interno TROBBU v17.22.1 - audit policy icon and scalable away-today badge",
   "scripts": {
     "serve": "python3 -m http.server 8080",
-    "qa": "node qa-v17.22.0.mjs"
+    "qa": "node qa-v17.22.1.mjs"
   },
   "dependencies": {
     "@vercel/speed-insights": "^2.1.0"

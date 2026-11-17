@@ -13,11 +13,11 @@
       "headers": [{"key": "Cache-Control", "value": "no-cache, no-store, must-revalidate"}]
     },
     {
-      "source": "/app-v17.22.0.js",
+      "source": "/app-v17.22.1.js",
       "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]
     },
     {
-      "source": "/styles-v17.22.0.css",
+      "source": "/styles-v17.22.1.css",
       "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]
     }
   ]

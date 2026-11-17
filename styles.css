@@ -2466,3 +2466,15 @@ html[data-theme="dark"] .audit-detail-footer{background:#111A22!important;border
 @media(max-width:700px){.audit-detail-modal-body{padding:14px!important;gap:12px}.audit-detail-footer{padding:10px 14px 14px!important}.audit-detail-footer .secondary-button{width:100%}}
 .helpdesk-portal-page>.page-header{margin-bottom:16px}.helpdesk-portal-page>.portal-metrics{margin-bottom:16px!important}.helpdesk-portal-page>.portal-category-stats{margin-bottom:16px!important}.helpdesk-portal-page>.request-list{margin-top:0}
 @media(max-width:700px){.helpdesk-portal-page>.page-header,.helpdesk-portal-page>.portal-metrics,.helpdesk-portal-page>.portal-category-stats{margin-bottom:12px!important}}
+
+/* v17.22.1 · Audit policy icon + scalable Fuera hoy badge */
+.audit-policy-card .audit-policy-icon{width:46px;height:46px;min-width:46px;flex:0 0 46px;border-radius:11px;display:grid;place-items:center;background:#E9F2FF;color:#0C66E4}
+.audit-policy-card .audit-policy-icon iconify-icon{font-size:21px;line-height:1;display:block}
+.out-today-badge{width:max-content;min-width:max-content;max-width:none;flex:0 0 auto;white-space:nowrap;line-height:1;padding-inline:11px;cursor:pointer}
+.out-today-badge span{display:inline!important;white-space:nowrap;line-height:1}
+.topbar-actions{min-width:0;flex-wrap:nowrap}
+html[data-theme="dark"] .audit-policy-card .audit-policy-icon{background:#173A64!important;color:#A8CCFF!important}
+@media(max-width:1180px){.global-topbar{grid-template-columns:280px minmax(220px,1fr) auto;gap:14px}.topbar-actions{gap:5px}.out-today-badge{padding-inline:9px;font-size:10.5px}}
+@media(max-width:920px){.out-today-badge{height:32px;padding-inline:8px}.out-today-badge span{display:inline!important}.topbar-actions .live-sync-indicator span{display:none}}
+@media(max-width:820px){.out-today-badge span{display:inline!important}.out-today-badge{min-width:max-content;max-width:none;font-size:10px;padding-inline:8px}.audit-policy-card .audit-policy-icon{width:42px;height:42px;min-width:42px;flex-basis:42px}.audit-policy-card .audit-policy-icon iconify-icon{font-size:19px}}
+@media(max-width:560px){.out-today-badge{gap:4px;padding-inline:7px;font-size:9.5px}.out-today-badge iconify-icon{font-size:14px}.topbar-actions{gap:4px}}
