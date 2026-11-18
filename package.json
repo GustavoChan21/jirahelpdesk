@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.25.1",
-  "description": "Jira Interno TROBBU v17.25.1 - private Realtime device notifications with bell alerts; email delivery retired",
+  "version": "17.26.0",
+  "description": "Jira Interno TROBBU v17.26.0 - scalable Helpdesk Broadcast, optimistic comments and resilient live counters",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
