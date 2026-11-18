@@ -1,11 +1,10 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.22.2",
-  "description": "Jira Interno TROBBU v17.22.2 - shared Vercel/GitHub header stabilization and dark portal contrast",
+  "version": "17.24.0",
+  "description": "Jira Interno TROBBU v17.24.0 - scalable bootstrap, personal Kanban ordering and resilient transactional email queue",
   "scripts": {
-    "serve": "python3 -m http.server 8080",
-    "qa": "node qa-v17.22.2.mjs"
+    "serve": "python3 -m http.server 8080"
   },
   "dependencies": {
     "@vercel/speed-insights": "^2.1.0"

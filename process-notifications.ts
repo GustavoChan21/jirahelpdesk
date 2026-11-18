@@ -8,7 +8,7 @@ const cors = {
 const APP = "https://jiratrobbu.vercel.app/";
 const DEFAULT_SENDER_NAME = "Notificaciones Jira x Helpdesk";
 
-// v17.20 keeps the proven low-noise policy from v17.11/v17.19.
+// v17.24 keeps the low-noise production policy and serializes delivery through the server cron.
 // Mentions and intermediate edits remain in-app. Email is reserved for the current
 // high-value transactional flow so PROD cannot suddenly fan out hundreds of messages.
 const EMAIL_EVENTS = new Set([
@@ -396,29 +396,22 @@ Deno.serve(async (req: Request) => {
     if (!key || !sender?.email) return out({ ok: false, configured: false, provider: key ? "sendpulse" : null, sender_error: sender?.error || null });
     if (!qa && !productionReady) return out({ ok: false, configured: true, provider: "sendpulse", sent: 0, skipped: true, reason: "production_sender_not_ready", sender: sender?.email || null, preferred_sender: preferredSender, smtp_test_mode: Boolean(sender?.test) });
 
-    const { data: rawRows, error: re } = await admin.from("notification_outbox")
-      .select("id,event_type,category,recipient_user_id,recipient_email,payload,ticket_id,attempts,created_at")
-      .eq("workspace_id", wid)
-      .in("status", ["pending", "failed"])
-      .gte("created_at", s.email_rollout_at || "1970-01-01T00:00:00Z")
-      .lt("attempts", 3)
-      .order("created_at", { ascending: true })
-      .limit(50);
-    if (re) throw re;
-
-    const rows = [...(rawRows || [])].sort((a: any, b: any) => {
-      const pa = a.event_type === "daily_jira_reminder" ? 1 : 0;
-      const pb = b.event_type === "daily_jira_reminder" ? 1 : 0;
-      return pa - pb || new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    const { data: rawRows, error: re } = await admin.rpc("claim_notification_batch", {
+      p_workspace: wid,
+      p_limit: 20,
+      p_rollout_at: s.email_rollout_at || "1970-01-01T00:00:00Z",
     });
+    if (re) throw re;
+    const rows = [...(rawRows || [])];
 
     let sent = 0, failed = 0, suppressed = 0, deferred = 0;
     const results: any[] = [];
     const seenQaEvents = new Set<string>();
 
-    for (const r of rows) {
+    for (let rowIndex=0;rowIndex<rows.length;rowIndex++) {
+      const r=rows[rowIndex];
       if (!EMAIL_EVENTS.has(r.event_type)) {
-        await admin.from("notification_outbox").update({ status: "suppressed", suppressed_at: new Date().toISOString(), suppressed_reason: qa ? "qa_event_not_enabled" : "email_event_not_enabled", provider: "sendpulse" }).eq("id", r.id);
+        await admin.from("notification_outbox").update({ status: "suppressed", suppressed_at: new Date().toISOString(), suppressed_reason: qa ? "qa_event_not_enabled" : "email_event_not_enabled", provider: "sendpulse", processing_at: null, next_attempt_at: null }).eq("id", r.id);
         suppressed++;
         continue;
       }
@@ -428,7 +421,7 @@ Deno.serve(async (req: Request) => {
         const entity = r.event_type === "helpdesk_comment" ? (meta.comment_id || r.id) : (meta.entity_id || r.ticket_id || meta.date || r.id);
         const qaEventKey = `${r.event_type}:${entity}:${meta.to_status || meta.action || ""}`;
         if (seenQaEvents.has(qaEventKey)) {
-          await admin.from("notification_outbox").update({ status: "suppressed", suppressed_at: new Date().toISOString(), suppressed_reason: "qa_duplicate_logical_event", provider: "sendpulse" }).eq("id", r.id);
+          await admin.from("notification_outbox").update({ status: "suppressed", suppressed_at: new Date().toISOString(), suppressed_reason: "qa_duplicate_logical_event", provider: "sendpulse", processing_at: null, next_attempt_at: null }).eq("id", r.id);
           suppressed++;
           continue;
         }
@@ -436,15 +429,18 @@ Deno.serve(async (req: Request) => {
       }
 
       const effectiveRemaining = qa ? Math.min(qaRemaining, hourRemaining, monthRemaining, providerTestRemaining) : Math.min(hourRemaining, monthRemaining, providerTestRemaining);
-      if (effectiveRemaining <= 0) { deferred++; continue; }
+      if (effectiveRemaining <= 0) {
+        await admin.from("notification_outbox").update({ status: "pending", processing_at: null, next_attempt_at: new Date(Date.now() + 15 * 60000).toISOString(), attempts: Math.max(0, Number(r.attempts || 1) - 1), last_error: "Deferred by provider/configured quota" }).eq("id", r.id);
+        deferred++;
+        continue;
+      }
 
       if (r.event_type === "daily_jira_reminder" && monthRemaining <= 100) {
-        await admin.from("notification_outbox").update({ status: "suppressed", suppressed_at: new Date().toISOString(), suppressed_reason: "monthly_reserve_for_transactional_email", provider: "sendpulse" }).eq("id", r.id);
+        await admin.from("notification_outbox").update({ status: "suppressed", suppressed_at: new Date().toISOString(), suppressed_reason: "monthly_reserve_for_transactional_email", provider: "sendpulse", processing_at: null, next_attempt_at: null }).eq("id", r.id);
         suppressed++;
         continue;
       }
 
-      await admin.from("notification_outbox").update({ status: "processing", attempts: Number(r.attempts || 0) + 1, provider: "sendpulse" }).eq("id", r.id);
       try {
         const er = await enrich(admin, r);
         const intended = await recipient(admin, er);
@@ -466,6 +462,8 @@ Deno.serve(async (req: Request) => {
           delivered_to: delivered,
           suppressed_at: null,
           suppressed_reason: null,
+          processing_at: null,
+          next_attempt_at: null,
         }).eq("id", r.id);
 
         sent++;
@@ -476,7 +474,29 @@ Deno.serve(async (req: Request) => {
         results.push({ id: r.id, event_type: r.event_type, thread_key: doc.threadKey, subject: doc.subject, message_id: pr.id, delivered_to: delivered });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        await admin.from("notification_outbox").update({ status: "failed", last_error: msg, provider: "sendpulse" }).eq("id", r.id);
+        const quota = /quota|bandwidth exceeded|too many messages|451 4\.9\.5|554 5\.9\.3/i.test(msg);
+        if (quota) {
+          const retryAt = new Date(Date.now() + 15 * 60000).toISOString();
+          await admin.from("notification_outbox").update({
+            status: "pending",
+            processing_at: null,
+            next_attempt_at: retryAt,
+            attempts: Math.max(0, Number(r.attempts || 1) - 1),
+            last_error: msg,
+            provider: "sendpulse",
+          }).eq("id", r.id);
+          deferred++;
+          results.push({ id: r.id, event_type: r.event_type, deferred: true, retry_at: retryAt, error: msg });
+          const remaining=rows.slice(rowIndex+1);
+          if(remaining.length){
+            const remainingIds=remaining.map((x:any)=>x.id);
+            await admin.from("notification_outbox").update({status:"pending",processing_at:null,next_attempt_at:retryAt,last_error:"Deferred after provider quota response"}).in("id",remainingIds);
+            for(const pending of remaining){await admin.from("notification_outbox").update({attempts:Math.max(0,Number(pending.attempts||1)-1)}).eq("id",pending.id)}
+            deferred+=remaining.length;
+          }
+          break; // Stop this batch so remaining rows do not hammer the provider.
+        }
+        await admin.from("notification_outbox").update({ status: "failed", processing_at: null, next_attempt_at: null, last_error: msg, provider: "sendpulse" }).eq("id", r.id);
         failed++;
         results.push({ id: r.id, event_type: r.event_type, error: msg });
       }
