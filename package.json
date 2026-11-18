@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.24.0",
-  "description": "Jira Interno TROBBU v17.24.0 - scalable bootstrap, personal Kanban ordering and resilient transactional email queue",
+  "version": "17.25.1",
+  "description": "Jira Interno TROBBU v17.25.1 - private Realtime device notifications with bell alerts; email delivery retired",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },

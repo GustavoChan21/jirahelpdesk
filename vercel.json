@@ -28,7 +28,7 @@
       ]
     },
     {
-      "source": "/app-v17.24.0.runtime.js",
+      "source": "/app-v17.25.1.runtime.js",
       "headers": [
         {
           "key": "Cache-Control",
@@ -37,7 +37,7 @@
       ]
     },
     {
-      "source": "/styles-v17.24.0.css",
+      "source": "/styles-v17.25.1.css",
       "headers": [
         {
           "key": "Cache-Control",
@@ -46,7 +46,7 @@
       ]
     },
     {
-      "source": "/boot-v17.24.0.js",
+      "source": "/boot-v17.25.1.js",
       "headers": [
         {
           "key": "Cache-Control",
@@ -55,11 +55,20 @@
       ]
     },
     {
-      "source": "/sw-v17.24.0.js",
+      "source": "/sw-v17.25.1.js",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/react-18.3.1.min.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     },
