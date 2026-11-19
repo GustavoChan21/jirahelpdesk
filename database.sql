@@ -14501,7 +14501,7 @@ drop trigger if exists trg_notification_web_push on public.notifications;
 create trigger trg_notification_web_push after insert on public.notifications for each row execute function private.dispatch_notification_web_push();
 
 
--- Jira TROBBU v17.29.9
+-- Jira TROBBU v17.29.10
 -- Restore notification history/counters for the intended recipient and preload the last 100 notifications in workspace bootstrap.
 
 drop policy if exists notifications_select on public.notifications;
