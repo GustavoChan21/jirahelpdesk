@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.27.0",
-  "description": "Jira Interno TROBBU v17.27.0 - scalable Helpdesk Broadcast, optimistic comments and resilient live counters",
+  "version": "17.28.1",
+  "description": "Jira Interno TROBBU v17.28.1 - light-mode Workspace settings contrast hotfix",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
