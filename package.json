@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.10",
-  "description": "Jira Interno TROBBU v17.29.10 — centro de notificaciones estable, lectura optimista, orden no leídas primero y fallback macOS Chromium.",
+  "version": "17.29.11",
+  "description": "Jira Interno TROBBU v17.29.11 — centro de notificaciones estable, lectura optimista, orden no leídas primero y fallback macOS Chromium.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },

@@ -42,17 +42,17 @@ function subscriptionBrowser(sub:any){
   if(/Safari\//i.test(ua)&&!/Chrome\//i.test(ua)) return "Safari";
   return label||"Navegador";
 }
-function pushPayload(n:any,sub:any){
+function pushPayload(n:any,sub:any,receipt:any=null){
   const highValue=new Set(["ticket_created","assigned_dev","assigned_qa","ticket_closed","ticket_mention","helpdesk_new","helpdesk_assigned","helpdesk_closed","helpdesk_mention","helpdesk_requirement_decision","vacation_requested","vacation_approved","vacation_rejected"]);
   return {
-    version:"17.29.10",notification_id:n.id??null,workspace_id:n.workspace_id,user_id:n.user_id,ticket_id:n.ticket_id??null,helpdesk_ticket_id:n.helpdesk_ticket_id??null,
+    version:"17.29.11",notification_id:n.id??null,workspace_id:n.workspace_id,user_id:n.user_id,ticket_id:n.ticket_id??null,helpdesk_ticket_id:n.helpdesk_ticket_id??null,
     type:n.type||"system",category:n.category||"system",title:clean(n.title||"Jira Interno TROBBU",120),
     body:clean(n.body||"Tienes una actualización en Jira Interno.",260),url:targetUrl(n),
     icon:APP+"pwa-icon-192.png",badge:APP+"pwa-icon-192.png",tag:n.id?`jira-${n.id}`:`jira-test-${Date.now()}`,
     requireInteraction:highValue.has(String(n.type||"")),silent:sub?.sound_enabled===false,metadata:n.metadata||{},
     platform:sub?.platform||null,device_label:sub?.device_label||null,browser:subscriptionBrowser(sub),
     actions:[{action:"open",title:"Abrir Jira"},{action:"mark-read",title:"Marcar leída"}],
-    visual:{kind:categoryIcon(String(n.category||"system"))},force_native:n?.metadata?.qa_preview===true
+    visual:{kind:categoryIcon(String(n.category||"system"))},force_native:n?.metadata?.qa_preview===true,delivery_id:receipt?.delivery_id??null,receipt_token:receipt?.receipt_token??null
   };
 }
 
@@ -103,21 +103,29 @@ async function sendToUser(admin:any,server:any,n:any){
   if(error)throw error;
   const results:any[]=[];
   for(const sub of subs||[]){
-    if(n.id){const {data:done}=await admin.from("web_push_delivery_log").select("id,status").eq("notification_id",n.id).eq("subscription_id",sub.id).eq("status","sent").maybeSingle();if(done){results.push({subscription_id:sub.id,status:"duplicate_skipped"});continue}}
-    const payload=pushPayload(n,sub);
+    if(n.id){
+      const {data:delivered}=await admin.from("web_push_delivery_log").select("id,status,received_at,displayed_at").eq("notification_id",n.id).eq("subscription_id",sub.id).eq("status","sent").maybeSingle();
+      if(delivered){results.push({subscription_id:sub.id,status:"duplicate_skipped",received_at:delivered.received_at,displayed_at:delivered.displayed_at});continue}
+    }
+    const receiptToken=crypto.randomUUID().replaceAll("-","")+crypto.randomUUID().replaceAll("-","");
+    const receiptHash=await sha(receiptToken);
+    const {data:delivery,error:deliveryError}=await admin.from("web_push_delivery_log").upsert({notification_id:n.id??null,subscription_id:sub.id,workspace_id:n.workspace_id,user_id:n.user_id,status:"queued",provider_status:null,error:null,display_error:null,receipt_token_hash:receiptHash,received_at:null,displayed_at:null,clicked_at:null},{onConflict:"notification_id,subscription_id",ignoreDuplicates:false}).select("id").single();
+    if(deliveryError)throw deliveryError;
+    const payload=pushPayload(n,sub,{delivery_id:delivery.id,receipt_token:receiptToken});
     try{
       const subscriber=server.subscribe({endpoint:sub.endpoint,keys:{p256dh:sub.p256dh,auth:sub.auth_key}});
       await subscriber.pushTextMessage(JSON.stringify(payload),{});
-      await admin.from("web_push_subscriptions").update({last_success_at:new Date().toISOString(),last_failure_at:null,failure_count:0,updated_at:new Date().toISOString()}).eq("id",sub.id);
-      await admin.from("web_push_delivery_log").upsert({notification_id:n.id??null,subscription_id:sub.id,workspace_id:n.workspace_id,user_id:n.user_id,status:"sent",provider_status:201,error:null},{onConflict:"notification_id,subscription_id",ignoreDuplicates:n.id?true:false});
-      results.push({subscription_id:sub.id,status:"sent"});
+      const now=new Date().toISOString();
+      await admin.from("web_push_subscriptions").update({last_success_at:now,last_failure_at:null,failure_count:0,updated_at:now}).eq("id",sub.id);
+      await admin.from("web_push_delivery_log").update({status:"sent",provider_status:201,error:null}).eq("id",delivery.id);
+      results.push({subscription_id:sub.id,status:"sent",delivery_id:delivery.id});
     }catch(error:any){
       const gone=error instanceof webpush.PushMessageError?error.isGone():false;
       const status=Number(error?.response?.status||error?.status||error?.statusCode||0)||null;
-      const message=clean(error?.message||String(error),480);
-      await admin.from("web_push_subscriptions").update({last_failure_at:new Date().toISOString(),failure_count:Number(sub.failure_count||0)+1,disabled_at:gone?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",sub.id);
-      await admin.from("web_push_delivery_log").upsert({notification_id:n.id??null,subscription_id:sub.id,workspace_id:n.workspace_id,user_id:n.user_id,status:gone?"gone":"failed",provider_status:status,error:message},{onConflict:"notification_id,subscription_id",ignoreDuplicates:false});
-      results.push({subscription_id:sub.id,status:gone?"gone":"failed",provider_status:status,error:message});
+      const message=clean(error?.message||String(error),480),now=new Date().toISOString();
+      await admin.from("web_push_subscriptions").update({last_failure_at:now,failure_count:Number(sub.failure_count||0)+1,disabled_at:gone?now:null,updated_at:now}).eq("id",sub.id);
+      await admin.from("web_push_delivery_log").update({status:gone?"gone":"failed",provider_status:status,error:message}).eq("id",delivery.id);
+      results.push({subscription_id:sub.id,status:gone?"gone":"failed",provider_status:status,error:message,delivery_id:delivery.id});
     }
   }
   return results;
@@ -128,9 +136,21 @@ Deno.serve(async(req:Request)=>{
   try{
     const body=await req.json().catch(()=>({}));
     const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,{auth:{autoRefreshToken:false,persistSession:false}});
+    const action=String(body.action||"dispatch");
+    if(action==="receipt"){
+      const deliveryId=Number(body.delivery_id||0),token=String(body.receipt_token||""),stage=String(body.stage||"received");
+      if(!deliveryId||!token)return out({error:"Invalid receipt"},400);
+      const {data:delivery,error:re}=await admin.from("web_push_delivery_log").select("id,receipt_token_hash,subscription_id").eq("id",deliveryId).maybeSingle();
+      if(re)throw re;
+      if(!delivery||!delivery.receipt_token_hash||(await sha(token))!==delivery.receipt_token_hash)return out({error:"Invalid receipt token"},403);
+      const now=new Date().toISOString(),patch:any={};
+      if(stage==="received")patch.received_at=now;else if(stage==="displayed")patch.displayed_at=now;else if(stage==="clicked")patch.clicked_at=now;else if(stage==="display_error")patch.display_error=clean(body.error||"Display failed",480);else return out({error:"Invalid receipt stage"},400);
+      const {error:updateDeliveryError}=await admin.from("web_push_delivery_log").update(patch).eq("id",deliveryId);if(updateDeliveryError)throw updateDeliveryError;
+      if(delivery.subscription_id){const subPatch:any={updated_at:now};if(stage==="received")subPatch.last_received_at=now;if(stage==="displayed")subPatch.last_displayed_at=now;if(stage==="clicked")subPatch.last_clicked_at=now;await admin.from("web_push_subscriptions").update(subPatch).eq("id",delivery.subscription_id)}
+      return out({ok:true,stage});
+    }
     const auth=await authorize(admin,req,body);
     if(!auth.ok)return out({error:auth.error},auth.status);
-    const action=String(body.action||"dispatch");
     if(action==="config"){const cfg=await ensureVapid(admin);return out({ok:true,enabled:true,vapid_public_key:cfg.vapid_public_key})}
     if(action==="subscribe"){
       if(auth.server)return out({error:"User session required"},403);
@@ -155,9 +175,9 @@ Deno.serve(async(req:Request)=>{
     }
     if(action==="diagnostic"){
       if(auth.server)return out({error:"User session required"},403);
-      const {data:subs,error:se}=await admin.from("web_push_subscriptions").select("id,device_label,platform,sound_enabled,disabled_at,last_success_at,last_failure_at,failure_count,updated_at").eq("workspace_id",auth.workspaceId).eq("user_id",auth.userId).order("updated_at",{ascending:false}).limit(10);
+      const {data:subs,error:se}=await admin.from("web_push_subscriptions").select("id,device_label,platform,sound_enabled,disabled_at,last_success_at,last_received_at,last_displayed_at,last_clicked_at,last_failure_at,failure_count,updated_at").eq("workspace_id",auth.workspaceId).eq("user_id",auth.userId).order("updated_at",{ascending:false}).limit(10);
       if(se)throw se;
-      const {data:deliveries,error:de}=await admin.from("web_push_delivery_log").select("status,provider_status,error,created_at,subscription_id").eq("workspace_id",auth.workspaceId).eq("user_id",auth.userId).order("created_at",{ascending:false}).limit(10);
+      const {data:deliveries,error:de}=await admin.from("web_push_delivery_log").select("status,provider_status,error,display_error,created_at,received_at,displayed_at,clicked_at,subscription_id").eq("workspace_id",auth.workspaceId).eq("user_id",auth.userId).order("created_at",{ascending:false}).limit(10);
       if(de)throw de;
       const active=(subs||[]).filter((s:any)=>!s.disabled_at);
       return out({ok:true,active_subscriptions:active.length,subscriptions:subs||[],latest_delivery:(deliveries||[])[0]||null,recent_deliveries:deliveries||[]});
