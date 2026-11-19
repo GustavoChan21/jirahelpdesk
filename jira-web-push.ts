@@ -12,22 +12,30 @@ const out=(data:any,status=200)=>new Response(JSON.stringify(data),{status,heade
 const clean=(v:any,n=220)=>{const s=String(v??"").replace(/\s+/g," ").trim();return s.length>n?s.slice(0,n-1)+"…":s};
 async function sha(v:string){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return Array.from(new Uint8Array(d)).map(x=>x.toString(16).padStart(2,"0")).join("")}
 
+function appUrl(view:string,params:Record<string,any>={}){
+  const url=new URL(APP);url.searchParams.set("view",view);
+  for(const [key,value] of Object.entries(params)){if(value!==null&&value!==undefined&&String(value)!=="")url.searchParams.set(key,String(value))}
+  return url.toString();
+}
 function targetUrl(n:any){
-  const m=n?.metadata||{},entity=m.entity_type,id=m.entity_id;
-  if(n?.ticket_id||entity==="ticket")return APP+`?view=board&ticket=${encodeURIComponent(String(n.ticket_id||id||""))}`;
-  if(n?.helpdesk_ticket_id||entity==="helpdesk")return APP+`?view=helpdesk&helpdesk=${encodeURIComponent(String(n.helpdesk_ticket_id||id||""))}`;
-  if(entity==="sprint")return APP+`?view=backlog&sprint=${encodeURIComponent(String(id||""))}`;
-  if(entity==="knowledge")return APP+"?view=knowledge";
-  if(entity==="vacation")return APP+"?view=vacations";
-  if(entity==="staff")return APP+"?view=team";
-  if(String(n?.type||"").includes("mention"))return APP+"?view=mentioned";
-  return APP+"?view=overview";
+  const m=n?.metadata||{},type=String(n?.type||m.event_type||""),entity=String(m.entity_type||""),category=String(n?.category||m.category||"");
+  const ticketId=n?.ticket_id||(entity==="ticket"?m.entity_id:null),helpdeskId=n?.helpdesk_ticket_id||(entity==="helpdesk"?m.entity_id:null);
+  if(type==="helpdesk_requirement_decision"){if(helpdeskId)return appUrl("helpdesk",{helpdesk:helpdeskId});const converted=m.converted_ticket_id||n?.ticket_id;if(converted)return appUrl("board",{ticket:converted})}
+  if(type==="ticket_sprint")return ticketId?appUrl("backlog",{ticket:ticketId}):appUrl("backlog",{sprint:m.sprint_id||null});
+  if(ticketId)return appUrl(type==="ticket_mention"||category==="mentions"?"mentioned":"board",{ticket:ticketId});
+  if(helpdeskId)return appUrl(type==="helpdesk_mention"||category==="mentions"?"mentioned":"helpdesk",{helpdesk:helpdeskId});
+  const sprintId=entity==="sprint"?(m.sprint_id||m.entity_id):(type.startsWith("sprint_")?m.sprint_id:null);if(sprintId)return appUrl("backlog",{sprint:sprintId});
+  const knowledgeId=entity==="knowledge"?(m.article_id||m.entity_id):(type.startsWith("knowledge_")?m.article_id:null);if(knowledgeId)return appUrl("knowledge",{knowledge:knowledgeId});
+  const vacationId=entity==="vacation"?m.entity_id:(type.startsWith("vacation_")?m.entity_id:null);if(vacationId)return appUrl("vacations",{tab:type==="vacation_requested"?"requests":"mine",vacation:vacationId});
+  const staffId=entity==="staff"?(m.member_user_id||m.entity_id):(type.startsWith("member_")?(m.member_user_id||m.entity_id):null);if(staffId)return appUrl("team",{tab:"staff",member:staffId});
+  if(category==="mentions"||type.includes("mention"))return appUrl("mentioned");
+  return appUrl("overview");
 }
 function categoryIcon(category:string){return ({tickets:"ticket",helpdesk:"helpdesk",mentions:"mention",sprints:"sprint",knowledge:"knowledge",vacations:"vacation",staff:"staff"} as any)[category]||"system"}
 function pushPayload(n:any,sub:any){
   const highValue=new Set(["ticket_created","assigned_dev","assigned_qa","ticket_closed","ticket_mention","helpdesk_new","helpdesk_assigned","helpdesk_closed","helpdesk_mention","helpdesk_requirement_decision","vacation_requested","vacation_approved","vacation_rejected"]);
   return {
-    version:"17.29.6",notification_id:n.id??null,workspace_id:n.workspace_id,user_id:n.user_id,
+    version:"17.29.8",notification_id:n.id??null,workspace_id:n.workspace_id,user_id:n.user_id,ticket_id:n.ticket_id??null,helpdesk_ticket_id:n.helpdesk_ticket_id??null,
     type:n.type||"system",category:n.category||"system",title:clean(n.title||"Jira Interno TROBBU",120),
     body:clean(n.body||"Tienes una actualización en Jira Interno.",260),url:targetUrl(n),
     icon:APP+"pwa-icon-192.png",badge:APP+"pwa-icon-192.png",tag:n.id?`jira-${n.id}`:`jira-test-${Date.now()}`,
@@ -133,6 +141,15 @@ Deno.serve(async(req:Request)=>{
       const endpoint=String(body.endpoint||"").trim();if(!endpoint)return out({error:"endpoint is required"},400);
       const {error:updateError}=await admin.from("web_push_subscriptions").update({sound_enabled:body.sound_enabled!==false,locale:body.locale==="en"?"en":"es",updated_at:new Date().toISOString()}).eq("user_id",auth.userId).eq("endpoint",endpoint);if(updateError)throw updateError;
       return out({ok:true});
+    }
+    if(action==="diagnostic"){
+      if(auth.server)return out({error:"User session required"},403);
+      const {data:subs,error:se}=await admin.from("web_push_subscriptions").select("id,device_label,platform,sound_enabled,disabled_at,last_success_at,last_failure_at,failure_count,updated_at").eq("workspace_id",auth.workspaceId).eq("user_id",auth.userId).order("updated_at",{ascending:false}).limit(10);
+      if(se)throw se;
+      const {data:deliveries,error:de}=await admin.from("web_push_delivery_log").select("status,provider_status,error,created_at,subscription_id").eq("workspace_id",auth.workspaceId).eq("user_id",auth.userId).order("created_at",{ascending:false}).limit(10);
+      if(de)throw de;
+      const active=(subs||[]).filter((s:any)=>!s.disabled_at);
+      return out({ok:true,active_subscriptions:active.length,subscriptions:subs||[],latest_delivery:(deliveries||[])[0]||null,recent_deliveries:deliveries||[]});
     }
     const {server}=await applicationServer(admin);
     if(action==="test"){

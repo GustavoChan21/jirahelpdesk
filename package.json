@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.6",
-  "description": "Jira Interno TROBBU v17.29.6 - guided per-device notification permission setup, real Web Push and superadmin-only QA",
+  "version": "17.29.8",
+  "description": "Jira Interno TROBBU v17.29.8 — notificaciones Web Push con deep-links deterministas por entidad, historial estable y QA responsive.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },

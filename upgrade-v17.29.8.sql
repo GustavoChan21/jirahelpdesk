@@ -1,0 +1,3 @@
+-- Jira Interno TROBBU v17.29.8
+-- Notification deep-link routing and QA hardening.
+-- No database schema change is required for this release.
