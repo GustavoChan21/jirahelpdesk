@@ -7215,7 +7215,8 @@ begin
   end if;
   if tg_op='UPDATE'
      and coalesce(old.proposal_status,'pending')<>'pending'
-     and new.product_id is distinct from old.product_id then
+     and new.product_id is distinct from old.product_id
+     and coalesce(current_setting('app.helpdesk_requirement_decision',true),'')<>'1' then
     raise exception 'El producto de un requerimiento ya evaluado no puede modificarse';
   end if;
   return new;
@@ -11587,7 +11588,7 @@ begin
         and wm.active=true
         and private.member_has_permission(v_req.workspace_id,wm.user_id,'manage_helpdesk')
         and wm.user_id is distinct from new.author_id
-      order by wm.created_at nulls last,wm.user_id
+      order by wm.joined_at nulls last,wm.user_id
       limit 1;
     end if;
   else
@@ -14155,8 +14156,8 @@ select set_config('app.helpdesk_requirement_decision','1',true);
 update public.helpdesk_tickets set status='closed',closed_at=coalesce(closed_at,decision_at,updated_at,now()) where category in ('module','feature','new_requirement') and proposal_status in ('accepted_backlog','rejected') and status<>'closed';
 
 
--- v17.29.1 Helpdesk atomic detail snapshot and comment touch trigger
--- Jira Interno TROBBU v17.29.1
+-- v17.29.2 Helpdesk atomic detail snapshot and comment touch trigger
+-- Jira Interno TROBBU v17.29.2
 -- Atomic Helpdesk detail snapshot + comment persistence reliability.
 
 begin;
@@ -14204,11 +14205,11 @@ create trigger trg_95_helpdesk_comment_touch_ticket after insert or update or de
 commit;
 
 -- ============================================================
--- v17.29.1 · Helpdesk Realtime Stabilization
+-- v17.29.2 · Helpdesk Realtime Stabilization
 -- Included in the full schema so a fresh install receives the same
 -- deterministic Helpdesk Broadcast/grant behavior as production.
 -- ============================================================
--- Jira TROBBU v17.29.1 - Helpdesk Realtime Stabilization
+-- Jira TROBBU v17.29.2 - Helpdesk Realtime Stabilization
 -- Applied to Supabase project: Jira Interno Trobbu
 -- Purpose: remove duplicate detail invalidations, touch list freshness for evidence,
 -- and harden exposed Helpdesk table grants.

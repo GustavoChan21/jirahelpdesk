@@ -1,4 +1,4 @@
--- Jira TROBBU v17.29.1 - Helpdesk Realtime Stabilization
+-- Jira TROBBU v17.29.2 - Helpdesk Realtime Stabilization
 -- Applied to Supabase project: Jira Interno Trobbu
 -- Purpose: remove duplicate detail invalidations, touch list freshness for evidence,
 -- and harden exposed Helpdesk table grants.
