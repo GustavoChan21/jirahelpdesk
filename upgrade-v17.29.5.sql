@@ -1,4 +1,4 @@
--- Jira TROBBU v17.29.5
+-- Jira TROBBU v17.29.6
 -- Restore notification history/counters for the intended recipient and preload the last 100 notifications in workspace bootstrap.
 
 drop policy if exists notifications_select on public.notifications;

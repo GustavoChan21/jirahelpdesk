@@ -27,7 +27,7 @@ function categoryIcon(category:string){return ({tickets:"ticket",helpdesk:"helpd
 function pushPayload(n:any,sub:any){
   const highValue=new Set(["ticket_created","assigned_dev","assigned_qa","ticket_closed","ticket_mention","helpdesk_new","helpdesk_assigned","helpdesk_closed","helpdesk_mention","helpdesk_requirement_decision","vacation_requested","vacation_approved","vacation_rejected"]);
   return {
-    version:"17.29.5",notification_id:n.id??null,workspace_id:n.workspace_id,user_id:n.user_id,
+    version:"17.29.6",notification_id:n.id??null,workspace_id:n.workspace_id,user_id:n.user_id,
     type:n.type||"system",category:n.category||"system",title:clean(n.title||"Jira Interno TROBBU",120),
     body:clean(n.body||"Tienes una actualización en Jira Interno.",260),url:targetUrl(n),
     icon:APP+"pwa-icon-192.png",badge:APP+"pwa-icon-192.png",tag:n.id?`jira-${n.id}`:`jira-test-${Date.now()}`,
