@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.8",
-  "description": "Jira Interno TROBBU v17.29.8 — notificaciones Web Push con deep-links deterministas por entidad, historial estable y QA responsive.",
+  "version": "17.29.9",
+  "description": "Jira Interno TROBBU v17.29.9 — centro de notificaciones estable, lectura optimista, orden no leídas primero y fallback macOS Chromium.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },

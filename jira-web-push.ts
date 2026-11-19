@@ -32,14 +32,25 @@ function targetUrl(n:any){
   return appUrl("overview");
 }
 function categoryIcon(category:string){return ({tickets:"ticket",helpdesk:"helpdesk",mentions:"mention",sprints:"sprint",knowledge:"knowledge",vacations:"vacation",staff:"staff"} as any)[category]||"system"}
+function subscriptionBrowser(sub:any){
+  const label=String(sub?.device_label||"").split("·").slice(1).join("·").trim();
+  if(label && !/Not:A-Brand|Navegador/i.test(label)) return label;
+  const ua=String(sub?.user_agent||"");
+  if(/Edg\//i.test(ua)) return "Microsoft Edge";
+  if(/Chrome\//i.test(ua)) return "Google Chrome";
+  if(/Firefox\//i.test(ua)) return "Firefox";
+  if(/Safari\//i.test(ua)&&!/Chrome\//i.test(ua)) return "Safari";
+  return label||"Navegador";
+}
 function pushPayload(n:any,sub:any){
   const highValue=new Set(["ticket_created","assigned_dev","assigned_qa","ticket_closed","ticket_mention","helpdesk_new","helpdesk_assigned","helpdesk_closed","helpdesk_mention","helpdesk_requirement_decision","vacation_requested","vacation_approved","vacation_rejected"]);
   return {
-    version:"17.29.8",notification_id:n.id??null,workspace_id:n.workspace_id,user_id:n.user_id,ticket_id:n.ticket_id??null,helpdesk_ticket_id:n.helpdesk_ticket_id??null,
+    version:"17.29.9",notification_id:n.id??null,workspace_id:n.workspace_id,user_id:n.user_id,ticket_id:n.ticket_id??null,helpdesk_ticket_id:n.helpdesk_ticket_id??null,
     type:n.type||"system",category:n.category||"system",title:clean(n.title||"Jira Interno TROBBU",120),
     body:clean(n.body||"Tienes una actualización en Jira Interno.",260),url:targetUrl(n),
     icon:APP+"pwa-icon-192.png",badge:APP+"pwa-icon-192.png",tag:n.id?`jira-${n.id}`:`jira-test-${Date.now()}`,
     requireInteraction:highValue.has(String(n.type||"")),silent:sub?.sound_enabled===false,metadata:n.metadata||{},
+    platform:sub?.platform||null,device_label:sub?.device_label||null,browser:subscriptionBrowser(sub),
     actions:[{action:"open",title:"Abrir Jira"},{action:"mark-read",title:"Marcar leída"}],
     visual:{kind:categoryIcon(String(n.category||"system"))},force_native:n?.metadata?.qa_preview===true
   };
