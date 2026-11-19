@@ -14156,8 +14156,8 @@ select set_config('app.helpdesk_requirement_decision','1',true);
 update public.helpdesk_tickets set status='closed',closed_at=coalesce(closed_at,decision_at,updated_at,now()) where category in ('module','feature','new_requirement') and proposal_status in ('accepted_backlog','rejected') and status<>'closed';
 
 
--- v17.29.2 Helpdesk atomic detail snapshot and comment touch trigger
--- Jira Interno TROBBU v17.29.2
+-- v17.29.3 Helpdesk atomic detail snapshot and comment touch trigger
+-- Jira Interno TROBBU v17.29.3
 -- Atomic Helpdesk detail snapshot + comment persistence reliability.
 
 begin;
@@ -14205,11 +14205,11 @@ create trigger trg_95_helpdesk_comment_touch_ticket after insert or update or de
 commit;
 
 -- ============================================================
--- v17.29.2 · Helpdesk Realtime Stabilization
+-- v17.29.3 · Helpdesk Realtime Stabilization
 -- Included in the full schema so a fresh install receives the same
 -- deterministic Helpdesk Broadcast/grant behavior as production.
 -- ============================================================
--- Jira TROBBU v17.29.2 - Helpdesk Realtime Stabilization
+-- Jira TROBBU v17.29.3 - Helpdesk Realtime Stabilization
 -- Applied to Supabase project: Jira Interno Trobbu
 -- Purpose: remove duplicate detail invalidations, touch list freshness for evidence,
 -- and harden exposed Helpdesk table grants.

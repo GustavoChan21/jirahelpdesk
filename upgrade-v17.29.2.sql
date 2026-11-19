@@ -1,4 +1,4 @@
--- Jira Interno TROBBU v17.29.2
+-- Jira Interno TROBBU v17.29.3
 -- Closed Helpdesk compatibility + comment notifications + legacy accepted-backlog normalization.
 
 begin;
