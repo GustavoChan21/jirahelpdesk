@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.28.2",
-  "description": "Jira Interno TROBBU v17.28.2 - light-mode Workspace settings contrast hotfix",
+  "version": "17.29.1",
+  "description": "Jira Interno TROBBU v17.29.1 - stable Helpdesk realtime-like synchronization and atomic detail snapshots",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
