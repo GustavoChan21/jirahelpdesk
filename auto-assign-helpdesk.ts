@@ -90,16 +90,40 @@ Deno.serve(async(req:Request)=>{
     }
 
     let chosen:any=null,reason="",confidence=0,provider="local";
+    // Prefer fast deterministic routing. External AI is only a short fallback
+    // when local responsibility matching is not sufficiently confident.
+    const localBest=[...candidates].sort((a:any,b:any)=>b.score-a.score||a.daily_count-b.daily_count||a.active_count-b.active_count)[0];
+    if(localBest&&localBest.score>=4){
+      chosen=localBest;
+      reason="Coincidencia local entre el contenido de la solicitud y la descripción de responsabilidades.";
+      confidence=Math.min(.75,.35+localBest.score*.08);
+      provider="local";
+    }
     const apiKey=Deno.env.get("OPENAI_API_KEY");
-    if(apiKey){
+    if(!chosen&&apiKey){
       try{
         const model=Deno.env.get("TROBBU_OPENAI_MODEL")||"gpt-6.1-sol";
-        const res=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json"},body:JSON.stringify({model,input:[{role:"developer",content:"You route internal TROBBU Helpdesk requests. Choose the staff member whose responsibility description clearly matches the request. Consider meaning, request type, department and product. Do not choose based on name. If no candidate is a reliable functional match, return user_id null instead of forcing an assignment. Capacity is informational: choose the best functional owner even if at capacity; overflow rules are applied afterwards. Return JSON only: {\"user_id\":\"uuid-or-null\",\"reason\":\"short Spanish explanation\",\"confidence\":0.0}. Use only the candidate IDs provided. Confidence below 0.45 means there is no reliable match."},{role:"user",content:`Request: ${ticketContext}\nCandidates: ${JSON.stringify(candidates.map((c:any)=>({user_id:c.user_id,responsibilities:c.context,daily_count:c.daily_count,daily_limit:c.daily_limit,active_count:c.active_count,active_limit:c.active_limit})))}`}],text:{format:{type:"json_object"}}})});
-        const payload=await res.json();
-        if(res.ok){const parsed=JSON.parse(extractText(payload));const parsedConfidence=Math.max(0,Math.min(1,Number(parsed.confidence)||0));const candidate=parsed?.user_id?candidates.find((c:any)=>c.user_id===parsed.user_id)||null:null;if(candidate&&parsedConfidence>=0.45){chosen=candidate;reason=String(parsed.reason||"").slice(0,900);confidence=parsedConfidence;provider=`openai:${model}`}else if(parsedConfidence<0.45||!parsed?.user_id){return new Response(JSON.stringify({ok:true,assigned:false,queued:true,provider:`openai:${model}`,reason:"no_routing_match",confidence:parsedConfidence,detail:String(parsed.reason||"No existe una coincidencia funcional suficientemente confiable.").slice(0,900)}),{headers:jsonHeaders})}}
-      }catch{}
+        const controller=new AbortController();
+        const timeout=setTimeout(()=>controller.abort(),2500);
+        try{
+          const res=await fetch("https://api.openai.com/v1/responses",{method:"POST",signal:controller.signal,headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json"},body:JSON.stringify({model,input:[{role:"developer",content:"You route internal TROBBU Helpdesk requests. Choose the staff member whose responsibility description clearly matches the request. Consider meaning, request type, department and product. Do not choose based on name. If no candidate is a reliable functional match, return user_id null instead of forcing an assignment. Capacity is informational: choose the best functional owner even if at capacity; overflow rules are applied afterwards. Return JSON only: {\"user_id\":\"uuid-or-null\",\"reason\":\"short Spanish explanation\",\"confidence\":0.0}. Use only the candidate IDs provided. Confidence below 0.45 means there is no reliable match."},{role:"user",content:`Request: ${ticketContext}\nCandidates: ${JSON.stringify(candidates.map((c:any)=>({user_id:c.user_id,responsibilities:c.context,daily_count:c.daily_count,daily_limit:c.daily_limit,active_count:c.active_count,active_limit:c.active_limit})))}`}],text:{format:{type:"json_object"}}})});
+          const payload=await res.json();
+          if(res.ok){
+            const parsed=JSON.parse(extractText(payload));
+            const parsedConfidence=Math.max(0,Math.min(1,Number(parsed.confidence)||0));
+            const candidate=parsed?.user_id?candidates.find((c:any)=>c.user_id===parsed.user_id)||null:null;
+            if(candidate&&parsedConfidence>=0.45){chosen=candidate;reason=String(parsed.reason||"").slice(0,900);confidence=parsedConfidence;provider=`openai:${model}`}
+          }
+        } finally { clearTimeout(timeout); }
+      }catch(err){console.warn("helpdesk routing AI fallback",err instanceof Error?err.message:String(err))}
     }
-    if(!chosen){chosen=[...candidates].sort((a:any,b:any)=>b.score-a.score||a.daily_count-b.daily_count||a.active_count-b.active_count)[0];if(!chosen||chosen.score<=0)return new Response(JSON.stringify({ok:true,assigned:false,queued:true,provider:"local",reason:"no_routing_match"}),{headers:jsonHeaders});reason="Coincidencia local entre el contenido de la solicitud y la descripción de responsabilidades.";confidence=Math.min(.75,.35+chosen.score*.08);provider="local"}
+    if(!chosen){
+      chosen=localBest;
+      if(!chosen||chosen.score<=0)return new Response(JSON.stringify({ok:true,assigned:false,queued:true,provider:"local",reason:"no_routing_match"}),{headers:jsonHeaders});
+      reason="Coincidencia local entre el contenido de la solicitud y la descripción de responsabilidades.";
+      confidence=Math.min(.75,.35+chosen.score*.08);
+      provider="local";
+    }
 
     let target=chosen;
     let source="auto_ai";
