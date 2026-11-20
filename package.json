@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.14",
-  "description": "Jira Interno TROBBU v17.29.14 — counters atómicos y estabilización concurrente de Helpdesk sin modificar Push ni otros módulos.",
+  "version": "17.29.15",
+  "description": "Jira Interno TROBBU v17.29.15 — snapshots monotónicos Realtime, tema persistente por usuario, counters Helpdesk locales y compatibilidad Brave Push.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
