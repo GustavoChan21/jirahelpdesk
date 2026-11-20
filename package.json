@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.18",
-  "description": "Jira Interno TROBBU v17.29.18 — Helpdesk Realtime canónico, counters atómicos, numeración y paginación de listados, tema estable y Push multiplataforma.",
+  "version": "17.29.19",
+  "description": "Jira Interno TROBBU v17.29.19 — Helpdesk Realtime deduplicado, paginación consistente, CRUD de tags internas y perfil con avatar recortable.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
