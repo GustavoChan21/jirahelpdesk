@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.22",
-  "description": "Jira Interno TROBBU v17.29.22 — Helpdesk transaccional y realtime automático, CRUD de clasificaciones internas y puestos reutilizables, perfil accionable y UX multiusuario estabilizada.",
+  "version": "17.29.23",
+  "description": "Jira Interno TROBBU v17.29.23 — CRUD autorreparable, realtime Helpdesk consolidado y UX luxury responsive para mobile, tablet e iPad.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
