@@ -44,7 +44,7 @@ Deno.serve(async(req:Request)=>{
     if(callerError)throw callerError;
     const {data:callerRole}=caller?.role_id?await admin.from("workspace_roles").select("*").eq("id",caller.role_id).maybeSingle():{data:null};
     if(!caller?.active||!memberPermission(caller,callerRole,"manage_staff"))return new Response(JSON.stringify({error:"No tienes permiso para administrar Staff en este workspace."}),{status:403,headers:{...cors,"Content-Type":"application/json"}});
-    const {data:target,error:targetError}=await admin.from("workspace_members").select("role,role_id,active,all_products,permissions,helpdesk_routing_description,helpdesk_auto_assign_enabled,helpdesk_daily_limit,helpdesk_active_limit,helpdesk_overflow_mode,helpdesk_overflow_user_id").eq("workspace_id",workspaceId).eq("user_id",targetUserId).maybeSingle();
+    const {data:target,error:targetError}=await admin.from("workspace_members").select("role,role_id,active,all_products,permissions,job_title_id,helpdesk_routing_description,helpdesk_auto_assign_enabled,helpdesk_daily_limit,helpdesk_active_limit,helpdesk_overflow_mode,helpdesk_overflow_user_id").eq("workspace_id",workspaceId).eq("user_id",targetUserId).maybeSingle();
     if(targetError)throw targetError;
     if(!target)throw new Error("El usuario no pertenece al workspace.");
     if(target.role==="superadmin"&&caller.role!=="superadmin")return new Response(JSON.stringify({error:"Solo un Superadmin puede modificar a otro Superadmin."}),{status:403,headers:{...cors,"Content-Type":"application/json"}});
@@ -62,9 +62,17 @@ Deno.serve(async(req:Request)=>{
 
       const email=String(body.email||"").trim().toLowerCase();
       const fullName=String(body.full_name||"").trim();
-      const jobTitle=String(body.job_title||"").trim();
+      const jobTitleId=body.job_title_id?String(body.job_title_id):null;
+      let jobTitle=String(body.job_title||"").trim();
       if(!email||!email.includes("@"))throw new Error("Ingresa un correo válido.");
       if(fullName.length>160||jobTitle.length>160)throw new Error("Nombre o puesto demasiado largo.");
+      if(jobTitleId){
+        const {data:position,error:positionError}=await admin.from("staff_job_titles").select("id,name,active").eq("workspace_id",workspaceId).eq("id",jobTitleId).maybeSingle();
+        if(positionError)throw positionError;
+        if(!position)throw new Error("El puesto seleccionado no pertenece a este workspace.");
+        if(position.active===false&&target.job_title_id!==jobTitleId)throw new Error("El puesto seleccionado está inactivo.");
+        jobTitle=String(position.name||"").trim();
+      }else{jobTitle="";}
       const routingDescription=String(body.helpdesk_routing_description||"").trim();
       if(routingDescription.length>1600)throw new Error("La descripción de enrutamiento es demasiado larga.");
       const portal=roleDef.code==="helpdesk_requester";
@@ -108,7 +116,7 @@ Deno.serve(async(req:Request)=>{
       };
       try{
         const {error:memberError}=await admin.from("workspace_members").update({
-          role_id:roleDef.id,role:roleDef.base_role,active:body.active!==false,all_products:allProducts,permissions,
+          role_id:roleDef.id,role:roleDef.base_role,active:body.active!==false,all_products:allProducts,permissions,job_title_id:jobTitleId,
           helpdesk_routing_description:portal?null:(routingDescription||null),helpdesk_auto_assign_enabled:autoAssign,
           helpdesk_daily_limit:dailyLimit,helpdesk_active_limit:activeLimit,helpdesk_overflow_mode:overflowMode,
           helpdesk_overflow_user_id:overflowUserId
@@ -121,7 +129,7 @@ Deno.serve(async(req:Request)=>{
         if(!allProducts&&productIds.length){const {error:insertProductsError}=await admin.from("workspace_member_products").insert(productIds.map((product_id:string)=>({workspace_id:workspaceId,user_id:targetUserId,product_id})));if(insertProductsError)throw insertProductsError;}
         const {data:authUser,error:authError}=await admin.auth.admin.updateUserById(targetUserId,{email,email_confirm:true,user_metadata:{...oldMeta,full_name:fullName||null}});
         if(authError)throw authError;
-        return new Response(JSON.stringify({ok:true,user_id:targetUserId,email:authUser.user?.email||email,role_id:roleDef.id,role:roleDef.base_role,active:body.active!==false,all_products:allProducts,product_ids:productIds}),{headers:{...cors,"Content-Type":"application/json"}});
+        return new Response(JSON.stringify({ok:true,user_id:targetUserId,email:authUser.user?.email||email,role_id:roleDef.id,role:roleDef.base_role,job_title_id:jobTitleId,job_title:jobTitle||null,active:body.active!==false,all_products:allProducts,product_ids:productIds}),{headers:{...cors,"Content-Type":"application/json"}});
       }catch(error){
         try{await rollback()}catch(rollbackError){console.error("manage-member rollback failed",rollbackError)}
         throw error;

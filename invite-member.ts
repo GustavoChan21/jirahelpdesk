@@ -76,6 +76,15 @@ Deno.serve(async(req:Request)=>{
       return new Response(JSON.stringify({error:"No tienes permiso para administrar Staff en este workspace."}),{status:403,headers:{...cors,"Content-Type":"application/json"}});
     }
 
+    const jobTitleId=body.job_title_id?String(body.job_title_id):null;
+    let jobTitle=String(body.job_title??"").trim();
+    if(jobTitleId){
+      const {data:position,error:positionError}=await admin.from("staff_job_titles").select("id,name,active").eq("workspace_id",workspaceId).eq("id",jobTitleId).maybeSingle();
+      if(positionError)throw positionError;
+      if(!position||position.active===false)throw new Error("El puesto seleccionado no está disponible en este workspace.");
+      jobTitle=String(position.name||"").trim();
+    }else{jobTitle="";}
+
     const normalized=legacyRole(String(body.role??"consulta"));
     let role:any=null;
     if(body.role_id){
@@ -115,6 +124,7 @@ Deno.serve(async(req:Request)=>{
     let inviteErrorMessage:string|null=null;
     const meta:any={workspace_id:workspaceId,role:role.base_role,role_id:role.id};
     if(fullName)meta.full_name=fullName;
+    if(jobTitle)meta.job_title=jobTitle;
 
     if(user&&authMode==="password")throw new Error("Este correo ya pertenece a un usuario. Para agregarlo al workspace usa Enviar invitación; la contraseña existente no se modifica desde Staff.");
 
@@ -139,8 +149,9 @@ Deno.serve(async(req:Request)=>{
     }
 
     if(!user?.id)throw new Error("No se pudo resolver el usuario.");
-    const {data:profile}=await admin.from("profiles").select("full_name,email").eq("id",user.id).maybeSingle();
-    await admin.from("profiles").update({email:user.email||email,full_name:fullName||profile?.full_name||null,updated_at:new Date().toISOString()}).eq("id",user.id);
+    const {data:profile}=await admin.from("profiles").select("full_name,email,job_title").eq("id",user.id).maybeSingle();
+    const {error:profileUpdateError}=await admin.from("profiles").update({email:user.email||email,full_name:fullName||profile?.full_name||null,job_title:jobTitle||null,updated_at:new Date().toISOString()}).eq("id",user.id);
+    if(profileUpdateError)throw profileUpdateError;
 
     const routingDescription=String(body.helpdesk_routing_description??"").trim().slice(0,4000)||null;
     const autoAssign=Boolean(body.helpdesk_auto_assign_enabled)&&role.base_role!=="consulta"&&role.code!=="helpdesk_requester";
@@ -165,7 +176,7 @@ Deno.serve(async(req:Request)=>{
     }
 
     const {error:memberError}=await admin.from("workspace_members").upsert({
-      workspace_id:workspaceId,user_id:user.id,role:role.base_role,role_id:role.id,active:true,
+      workspace_id:workspaceId,user_id:user.id,role:role.base_role,role_id:role.id,active:true,job_title_id:jobTitleId,
       all_products:allProducts,permissions:overrides,
       helpdesk_routing_description:routingDescription,
       helpdesk_auto_assign_enabled:autoAssign,
@@ -190,7 +201,7 @@ Deno.serve(async(req:Request)=>{
     },{onConflict:"workspace_id,email"});
 
     return new Response(JSON.stringify({
-      ok:true,user_id:user.id,role_id:role.id,role_code:role.code,
+      ok:true,user_id:user.id,role_id:role.id,role_code:role.code,job_title_id:jobTitleId,job_title:jobTitle||null,
       invitation_sent:invitationSent,temporary_password:temporaryPassword,
       invite_warning:inviteErrorMessage,membership_active:true,
       status:user.email_confirmed_at||temporaryPassword?"accepted":"pending",
