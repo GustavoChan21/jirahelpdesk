@@ -28,34 +28,34 @@
       ]
     },
     {
-      "source": "/app-v17.29.23.runtime.js",
+      "source": "/app-v17.29.24.runtime.js",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
     },
     {
-      "source": "/styles-v17.29.23.css",
+      "source": "/styles-v17.29.24.css",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
     },
     {
-      "source": "/boot-v17.29.23.js",
+      "source": "/boot-v17.29.24.js",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
     },
     {
-      "source": "/sw-v17.29.23.js",
+      "source": "/sw-v17.29.24.js",
       "headers": [
         {
           "key": "Cache-Control",
