@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.24",
-  "description": "Jira Interno TROBBU v17.29.24 — counters Helpdesk atómicos, digest de reconciliación realtime, caché anti-skew y UX luxury responsive.",
+  "version": "17.29.25",
+  "description": "Jira Interno TROBBU v17.29.25 — Helpdesk Live Data con store único, reloj monotónico, recuperación automática y realtime sin parpadeos.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
