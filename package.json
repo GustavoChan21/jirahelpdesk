@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.27",
-  "description": "Jira Interno TROBBU v17.29.27 — Visor universal de adjuntos con carrusel por tipo, imagen completa y zoom/pan sin alterar el pipeline de 10 archivos ni el live-state de Helpdesk.",
+  "version": "17.29.28",
+  "description": "Jira Interno TROBBU v17.29.28 — Visor universal de adjuntos con carrusel por tipo, imagen completa y zoom/pan sin alterar el pipeline de 10 archivos ni el live-state de Helpdesk.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
