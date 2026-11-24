@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.34",
-  "description": "Jira Interno TROBBU v17.29.34 — Helpdesk status workflow determinista: cambio de estado optimista, counters origen/destino instantáneos y Realtime deduplicado, preservando CRUD de comentarios y live-state.",
+  "version": "17.29.35",
+  "description": "Jira Interno TROBBU v17.29.35 — Helpdesk counters canónicos: modal y select rápido actualizan origen/destino al instante, decisiones optimistas, Realtime deduplicado y CRUD de comentarios preservado.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
