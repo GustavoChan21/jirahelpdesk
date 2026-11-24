@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.29",
-  "description": "Jira Interno TROBBU v17.29.29 — Visor de adjuntos determinista: imagen completa sin recorte, zoom real 10–500 y carrusel por índice numérico, sin alterar uploads ni live-state de Helpdesk.",
+  "version": "17.29.30",
+  "description": "Jira Interno TROBBU v17.29.30 — Visor de adjuntos determinista: imagen completa sin recorte, zoom real 10–500 y carrusel por índice numérico, sin alterar uploads ni live-state de Helpdesk.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
