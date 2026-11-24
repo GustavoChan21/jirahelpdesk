@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.31",
-  "description": "Jira Interno TROBBU v17.29.31 — Corrige la regresión statusOptions del modal genérico de comentarios/evidencia y valida flujos Ticket, Sprint y Helpdesk sin modificar backend ni datos.",
+  "version": "17.30.2",
+  "description": "Jira Interno TROBBU v17.30.2 — módulo Compresor de imágenes con permisos por rol, optimización WebP en navegador, redimensión opcional y colección privada persistente en Supabase.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
