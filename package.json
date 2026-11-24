@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.35",
-  "description": "Jira Interno TROBBU v17.29.35 — Helpdesk counters canónicos: modal y select rápido actualizan origen/destino al instante, decisiones optimistas, Realtime deduplicado y CRUD de comentarios preservado.",
+  "version": "17.30.0",
+  "description": "Jira Interno TROBBU v17.30.0 — módulo Compresor de imágenes con permisos por rol, optimización WebP en navegador, redimensión opcional y colección privada persistente en Supabase.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
