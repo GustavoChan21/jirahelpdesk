@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.29.32",
-  "description": "Jira Interno TROBBU v17.29.32 — Estabiliza comentarios Ticket/Sprint/Helpdesk: render inmediato independiente de adjuntos, realtime resiliente y evidencias/menciones opcionales sin pérdida de comentarios.",
+  "version": "17.29.33",
+  "description": "Jira Interno TROBBU v17.29.33 — CRUD de comentarios determinista: create/update/delete instantáneo, counters coherentes y Realtime directo en Ticket, Sprint y Helpdesk sin depender de recargas completas.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
