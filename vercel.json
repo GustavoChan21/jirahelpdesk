@@ -28,7 +28,7 @@
       ]
     },
     {
-      "source": "/app-v17.30.5.runtime.js",
+      "source": "/app-v17.30.6.runtime.js",
       "headers": [
         {
           "key": "Cache-Control",
@@ -37,7 +37,7 @@
       ]
     },
     {
-      "source": "/styles-v17.30.5.css",
+      "source": "/styles-v17.30.6.css",
       "headers": [
         {
           "key": "Cache-Control",
@@ -46,7 +46,7 @@
       ]
     },
     {
-      "source": "/boot-v17.30.5.js",
+      "source": "/boot-v17.30.6.js",
       "headers": [
         {
           "key": "Cache-Control",
@@ -55,7 +55,7 @@
       ]
     },
     {
-      "source": "/sw-v17.30.5.js",
+      "source": "/sw-v17.30.6.js",
       "headers": [
         {
           "key": "Cache-Control",
