@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.30.7",
-  "description": "Jira Interno TROBBU v17.30.7 — hilos de comentarios en Helpdesk, sprints y tickets; conserva el compresor de imágenes.",
+  "version": "17.30.8",
+  "description": "Jira Interno TROBBU v17.30.8 — jerarquía visual de hilos en Helpdesk, sprints y tickets.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },
