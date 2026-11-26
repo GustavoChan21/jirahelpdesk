@@ -1,8 +1,8 @@
 {
   "name": "jira-interno-trobbu-github-pages",
   "private": true,
-  "version": "17.30.6",
-  "description": "Jira Interno TROBBU v17.30.6 — módulo Compresor de imágenes con permisos por rol, optimización WebP en navegador, redimensión opcional y colección privada persistente en Supabase.",
+  "version": "17.30.7",
+  "description": "Jira Interno TROBBU v17.30.7 — hilos de comentarios en Helpdesk, sprints y tickets; conserva el compresor de imágenes.",
   "scripts": {
     "serve": "python3 -m http.server 8080"
   },

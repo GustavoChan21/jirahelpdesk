@@ -172,3 +172,45 @@ alter table public.image_compression_assets replica identity full;
 analyze public.image_compression_assets;
 notify pgrst,'reload schema';
 commit;
+
+
+begin;
+-- Jira TROBBU 17.30.7: threaded comments, same entity, no reparenting.
+create or replace function private.guard_comment_thread() returns trigger language plpgsql security invoker set search_path='' as $$
+declare scope_id uuid; found_parent boolean;
+begin
+  scope_id := (to_jsonb(new)->>tg_argv[0])::uuid;
+  if tg_op='UPDATE' then
+    if new.id is distinct from old.id or new.parent_comment_id is distinct from old.parent_comment_id or scope_id is distinct from (to_jsonb(old)->>tg_argv[0])::uuid then
+      raise exception 'No se puede mover un comentario a otro hilo.' using errcode='23514';
+    end if;
+    return new;
+  end if;
+  if new.parent_comment_id is null then return new; end if;
+  if new.parent_comment_id=new.id then raise exception 'Un comentario no puede responderse a sí mismo.' using errcode='23514'; end if;
+  execute format('select exists(select 1 from %I.%I where id=$1 and %I=$2)',tg_table_schema,tg_table_name,tg_argv[0]) into found_parent using new.parent_comment_id,scope_id;
+  if not found_parent then raise exception 'El comentario original no está disponible en este ticket.' using errcode='23503'; end if;
+  return new;
+end $$;
+revoke all on function private.guard_comment_thread() from public,anon;
+alter table public.ticket_comments add column if not exists parent_comment_id uuid;
+create unique index if not exists ticket_comments_thread_scope_uidx on public.ticket_comments(id,ticket_id);
+create index if not exists ticket_comments_thread_parent_idx on public.ticket_comments(parent_comment_id,ticket_id) where parent_comment_id is not null;
+do $$ begin if not exists(select 1 from pg_constraint where conrelid='public.ticket_comments'::regclass and conname='ticket_comments_thread_parent_fk') then alter table public.ticket_comments add constraint ticket_comments_thread_parent_fk foreign key(parent_comment_id,ticket_id) references public.ticket_comments(id,ticket_id) on delete no action; end if; end $$;
+drop trigger if exists trg_guard_comment_thread on public.ticket_comments;
+create trigger trg_guard_comment_thread before insert or update of id,parent_comment_id,ticket_id on public.ticket_comments for each row execute function private.guard_comment_thread('ticket_id');
+alter table public.sprint_comments add column if not exists parent_comment_id uuid;
+create unique index if not exists sprint_comments_thread_scope_uidx on public.sprint_comments(id,sprint_id);
+create index if not exists sprint_comments_thread_parent_idx on public.sprint_comments(parent_comment_id,sprint_id) where parent_comment_id is not null;
+do $$ begin if not exists(select 1 from pg_constraint where conrelid='public.sprint_comments'::regclass and conname='sprint_comments_thread_parent_fk') then alter table public.sprint_comments add constraint sprint_comments_thread_parent_fk foreign key(parent_comment_id,sprint_id) references public.sprint_comments(id,sprint_id) on delete no action; end if; end $$;
+drop trigger if exists trg_guard_comment_thread on public.sprint_comments;
+create trigger trg_guard_comment_thread before insert or update of id,parent_comment_id,sprint_id on public.sprint_comments for each row execute function private.guard_comment_thread('sprint_id');
+alter table public.helpdesk_comments add column if not exists parent_comment_id uuid;
+create unique index if not exists helpdesk_comments_thread_scope_uidx on public.helpdesk_comments(id,helpdesk_ticket_id);
+create index if not exists helpdesk_comments_thread_parent_idx on public.helpdesk_comments(parent_comment_id,helpdesk_ticket_id) where parent_comment_id is not null;
+do $$ begin if not exists(select 1 from pg_constraint where conrelid='public.helpdesk_comments'::regclass and conname='helpdesk_comments_thread_parent_fk') then alter table public.helpdesk_comments add constraint helpdesk_comments_thread_parent_fk foreign key(parent_comment_id,helpdesk_ticket_id) references public.helpdesk_comments(id,helpdesk_ticket_id) on delete no action; end if; end $$;
+drop trigger if exists trg_guard_comment_thread on public.helpdesk_comments;
+create trigger trg_guard_comment_thread before insert or update of id,parent_comment_id,helpdesk_ticket_id on public.helpdesk_comments for each row execute function private.guard_comment_thread('helpdesk_ticket_id');
+
+notify pgrst,'reload schema';
+commit;
