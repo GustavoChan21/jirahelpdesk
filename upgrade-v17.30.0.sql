@@ -313,3 +313,117 @@ end
 $$;
 notify pgrst,'reload schema';
 commit;
+
+-- v17.30.10: historical sprint delivery and carryover tracking.
+alter table public.sprints add column if not exists delivery_frozen_at timestamptz;
+alter table public.sprints add column if not exists delivery_source text;
+create table if not exists public.sprint_delivery_history (
+  sprint_id uuid not null references public.sprints(id) on delete cascade,
+  ticket_id uuid not null,
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  product_id uuid not null,
+  ticket_key text,
+  title text not null,
+  status_at_close text not null,
+  story_points numeric,
+  dev_owner_id uuid,
+  qa_owner_id uuid,
+  created_by uuid,
+  closed_by uuid,
+  due_date date,
+  captured_at timestamptz not null,
+  transfers jsonb not null default '[]'::jsonb,
+  first_closed_at timestamptz,
+  first_closed_sprint_id uuid,
+  first_closed_sprint_name text,
+  later_sprint_count integer,
+  primary key(sprint_id,ticket_id)
+);
+create index if not exists sprint_delivery_history_workspace_idx on public.sprint_delivery_history(workspace_id,sprint_id);
+create index if not exists sprint_delivery_history_ticket_idx on public.sprint_delivery_history(ticket_id);
+alter table public.sprint_delivery_history enable row level security;
+revoke all on public.sprint_delivery_history from public,anon,authenticated;
+grant select on public.sprint_delivery_history to authenticated;
+drop policy if exists sprint_delivery_history_select on public.sprint_delivery_history;
+create policy sprint_delivery_history_select on public.sprint_delivery_history for select to authenticated using(private.has_workspace_permission(workspace_id,'view_dashboard') and private.has_workspace_permission(workspace_id,'view_tickets') and private.has_product_access(workspace_id,product_id));
+-- Only triggers write history; no client INSERT/UPDATE/DELETE grants.
+create or replace function private.freeze_sprint_delivery() returns trigger language plpgsql security definer set search_path='' as $$
+begin
+  if tg_op='INSERT' then
+    new.delivery_frozen_at:=null; new.delivery_source:=null;
+    if new.status='completed' then raise exception 'Crea el sprint y ciérralo desde su detalle.'; end if;
+    return new;
+  end if;
+  if auth.uid() is null and old.delivery_frozen_at is null and new.delivery_source='reconstructed' then return new; end if;
+  new.delivery_frozen_at:=old.delivery_frozen_at; new.delivery_source:=old.delivery_source;
+  if old.status='completed' and new.status<>'completed' then raise exception 'El sprint cerrado conserva su historial; crea un nuevo sprint.'; end if;
+  if old.status<>'completed' and new.status='completed' then
+    if not private.has_workspace_permission(old.workspace_id,'manage_sprints') then raise exception 'Sin permiso para cerrar sprint' using errcode='42501'; end if;
+    if exists(select 1 from public.tickets t where t.sprint_id=old.id and not private.has_product_access(t.workspace_id,t.product_id)) then raise exception 'El cierre requiere acceso a todos los productos del sprint.' using errcode='42501'; end if;
+    perform 1 from public.tickets t where t.sprint_id=old.id order by t.id for update;
+    new.delivery_frozen_at:=statement_timestamp(); new.delivery_source:='snapshot';
+    insert into public.sprint_delivery_history(sprint_id,ticket_id,workspace_id,product_id,ticket_key,title,status_at_close,story_points,dev_owner_id,qa_owner_id,created_by,closed_by,due_date,captured_at)
+    select old.id,t.id,t.workspace_id,t.product_id,t.ticket_key,t.title,t.status::text,t.story_points,t.dev_owner_id,t.qa_owner_id,coalesce(t.created_by,t.reporter_id),t.closed_by,t.due_date,new.delivery_frozen_at from public.tickets t where t.sprint_id=old.id;
+  end if;
+  return new;
+end $$;
+revoke all on function private.freeze_sprint_delivery() from public,anon,authenticated;
+drop trigger if exists trg_freeze_sprint_delivery on public.sprints;
+create trigger trg_freeze_sprint_delivery before insert or update on public.sprints for each row execute function private.freeze_sprint_delivery();
+create or replace function private.track_sprint_delivery() returns trigger language plpgsql security definer set search_path='' as $$
+declare dest_name text; dest_start date;
+begin
+  if new.sprint_id is not distinct from old.sprint_id and new.status is not distinct from old.status then return new; end if;
+  select s.name,s.start_date into dest_name,dest_start from public.sprints s where s.id=new.sprint_id and s.workspace_id=new.workspace_id;
+  if new.sprint_id is distinct from old.sprint_id then
+    update public.sprint_delivery_history h set transfers=h.transfers||jsonb_build_array(jsonb_build_object('sprint_id',new.sprint_id,'name',coalesce(dest_name,'Backlog'),'at',statement_timestamp()))
+    where h.ticket_id=new.id and h.workspace_id=new.workspace_id and h.status_at_close<>'closed' and h.first_closed_at is null;
+  end if;
+  if new.status='closed' and old.status<>'closed' then
+    update public.sprint_delivery_history h set first_closed_at=coalesce(new.closed_at,statement_timestamp()),first_closed_sprint_id=new.sprint_id,first_closed_sprint_name=coalesce(dest_name,'Fuera de sprint'),later_sprint_count=case when dest_start is null or origin.start_date is null then null else (select count(*)::int from public.sprints x where x.workspace_id=h.workspace_id and x.start_date>origin.start_date and x.start_date<=dest_start) end
+    from public.sprints origin where origin.id=h.sprint_id and h.ticket_id=new.id and h.workspace_id=new.workspace_id and h.status_at_close<>'closed' and h.first_closed_at is null;
+  end if;
+  return new;
+end $$;
+revoke all on function private.track_sprint_delivery() from public,anon,authenticated;
+drop trigger if exists trg_track_sprint_delivery on public.tickets;
+create trigger trg_track_sprint_delivery after update of sprint_id,status on public.tickets for each row execute function private.track_sprint_delivery();
+create or replace function public.close_sprint_and_rollover(p_sprint_id uuid,p_next_sprint_id uuid default null) returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
+declare v_workspace uuid; v_status public.sprint_status; v_moved integer:=0;
+begin
+  select workspace_id,status into v_workspace,v_status from public.sprints where id=p_sprint_id for update;
+  if v_workspace is null then raise exception 'Sprint not found'; end if;
+  if not private.has_workspace_permission(v_workspace,'manage_sprints') or not private.has_workspace_permission(v_workspace,'edit_tickets') then raise exception 'No tienes permiso para cerrar y trasladar el sprint' using errcode='42501'; end if;
+  if v_status='completed' then raise exception 'El sprint ya está cerrado.'; end if;
+  if p_next_sprint_id is not null then
+    if p_next_sprint_id=p_sprint_id or not exists(select 1 from public.sprints where id=p_next_sprint_id and workspace_id=v_workspace and status<>'completed') then raise exception 'El destino debe ser otro sprint abierto del mismo espacio.'; end if;
+  end if;
+  -- The BEFORE trigger freezes membership and status before any tickets move.
+  update public.sprints set status='completed' where id=p_sprint_id;
+  if p_next_sprint_id is not null then
+    update public.tickets set sprint_id=p_next_sprint_id where sprint_id=p_sprint_id and status<>'closed';
+    get diagnostics v_moved=row_count;
+    update public.sprints set status='active' where id=p_next_sprint_id and status='planned';
+  else
+    update public.tickets set sprint_id=null,status='backlog' where sprint_id=p_sprint_id and status<>'closed';
+    get diagnostics v_moved=row_count;
+  end if;
+  return jsonb_build_object('ok',true,'moved',v_moved,'source_sprint_id',p_sprint_id,'next_sprint_id',p_next_sprint_id);
+end $$;
+revoke all on function public.close_sprint_and_rollover(uuid,uuid) from public,anon;
+grant execute on function public.close_sprint_and_rollover(uuid,uuid) to authenticated;
+notify pgrst,'reload schema';
+-- Use the same frozen membership in period reports, never current membership for completed sprints.
+do $$
+declare f text; a integer; b integer; seg text;
+begin
+select pg_get_functiondef('public.get_workspace_progress_report(uuid,date)'::regprocedure) into f;
+a:=strpos(f,'), sprint_rows as ('); b:=strpos(f,'), module_rows as (');
+if a=0 or b<=a then raise exception 'Unexpected report definition'; end if;
+seg:=substring(f from a for b-a);
+if strpos(seg,'sprint_delivery_history')>0 then return; end if;
+seg:=replace(seg,'left join visible_tickets v on v.sprint_id=s.id', 'left join (select v.id,v.sprint_id,v.weight,v.status::text status,v.due_date from visible_tickets v join public.sprints live on live.id=v.sprint_id and live.status<>''completed'' union all select h.ticket_id,h.sprint_id,coalesce(h.story_points,1)::numeric,h.status_at_close,h.due_date from public.sprint_delivery_history h where h.workspace_id=p_workspace) v on v.sprint_id=s.id');
+seg:=replace(seg,'where s.workspace_id=p_workspace','where s.workspace_id=p_workspace and (s.status<>''completed'' or s.delivery_frozen_at is not null)');
+seg:=replace(seg,'count(v.id) filter(where private.ticket_has_open_blockers(v.id))','count(v.id) filter(where s.status<>''completed'' and private.ticket_has_open_blockers(v.id))');
+execute substring(f from 1 for a-1)||seg||substring(f from b);
+end $$;
