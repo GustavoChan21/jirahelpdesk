@@ -5082,13 +5082,13 @@ begin
   ), sprint_rows as (
     select s.id,s.name,s.status,s.start_date,s.end_date,
       count(v.id)::int total_tickets,
-      count(v.id) filter(where v.status in ('qa_passed','closed'))::int completed,
-      count(v.id) filter(where v.status not in ('qa_passed','closed'))::int remaining,
+      count(v.id) filter(where v.status='closed')::int completed,
+      count(v.id) filter(where v.status<>'closed')::int remaining,
       coalesce(sum(v.weight),0)::numeric total_sp,
-      coalesce(sum(v.weight) filter(where v.status in ('qa_passed','closed')),0)::numeric completed_sp,
+      coalesce(sum(v.weight) filter(where v.status='closed'),0)::numeric completed_sp,
       count(v.id) filter(where private.ticket_has_open_blockers(v.id))::int blocked,
       count(v.id) filter(where v.due_date is not null and v.due_date<=coalesce(s.end_date,p_as_of) and v.status not in ('closed'))::int planned_by_sprint_end,
-      coalesce(round(100.0*count(v.id) filter(where v.status in ('qa_passed','closed'))/nullif(count(v.id),0),1),0) progress_percent
+      coalesce(round(100.0*count(v.id) filter(where v.status='closed')/nullif(count(v.id),0),1),0) progress_percent
     from public.sprints s
     left join visible_tickets v on v.sprint_id=s.id
     where s.workspace_id=p_workspace

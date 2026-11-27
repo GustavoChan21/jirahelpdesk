@@ -214,3 +214,102 @@ create trigger trg_guard_comment_thread before insert or update of id,parent_com
 
 notify pgrst,'reload schema';
 commit;
+
+
+-- 17.30.9: sprint delivery counts closed tickets only.
+begin;
+create or replace function public.get_workspace_progress_report(p_workspace uuid,p_as_of date default current_date)
+returns jsonb
+language plpgsql
+stable
+security invoker
+set search_path=public,pg_temp
+as $$
+declare result jsonb;
+declare week_end date:=p_as_of + (7-extract(isodow from p_as_of)::int);
+begin
+  if not private.has_workspace_permission(p_workspace,'view_dashboard') then
+    raise exception 'No tienes permiso para consultar reportes de este workspace';
+  end if;
+
+  with visible_tickets as (
+    select t.*,
+      coalesce(t.story_points,1)::numeric as weight,
+      case t.status
+        when 'backlog' then 0 when 'todo' then 10 when 'in_progress' then 45 when 'dev_done' then 65
+        when 'qa_review' then 78 when 'qa_rejected' then 58 when 'qa_passed' then 92 when 'closed' then 100 else 0 end::numeric as progress
+    from public.tickets t
+    where t.workspace_id=p_workspace and private.has_product_access(t.workspace_id,t.product_id)
+  ), product_rows as (
+    select p.id,p.key,p.name,
+      count(v.id)::int total_tickets,
+      coalesce(sum(v.weight),0)::numeric total_sp,
+      coalesce(round(sum(v.weight*v.progress)/nullif(sum(v.weight),0),1),0) progress_percent,
+      count(v.id) filter(where v.status='backlog')::int backlog,
+      count(v.id) filter(where v.status in ('todo','in_progress','dev_done'))::int development,
+      count(v.id) filter(where v.status in ('qa_review','qa_rejected','qa_passed'))::int qa,
+      count(v.id) filter(where v.status='closed')::int closed,
+      count(v.id) filter(where v.due_date<p_as_of and v.status not in ('qa_passed','closed'))::int overdue,
+      count(v.id) filter(where v.due_date between p_as_of and week_end and v.status not in ('closed'))::int due_this_week,
+      coalesce(sum(v.weight) filter(where v.due_date between p_as_of and week_end and v.status not in ('closed')),0)::numeric sp_due_this_week,
+      count(v.id) filter(where private.ticket_has_open_blockers(v.id))::int blocked
+    from public.products p
+    left join visible_tickets v on v.product_id=p.id
+    where p.workspace_id=p_workspace and private.has_product_access(p.workspace_id,p.id)
+    group by p.id,p.key,p.name,p.board_order
+    order by p.board_order
+  ), sprint_rows as (
+    select s.id,s.name,s.status,s.start_date,s.end_date,
+      count(v.id)::int total_tickets,
+      count(v.id) filter(where v.status='closed')::int completed,
+      count(v.id) filter(where v.status<>'closed')::int remaining,
+      coalesce(sum(v.weight),0)::numeric total_sp,
+      coalesce(sum(v.weight) filter(where v.status='closed'),0)::numeric completed_sp,
+      count(v.id) filter(where private.ticket_has_open_blockers(v.id))::int blocked,
+      count(v.id) filter(where v.due_date is not null and v.due_date<=coalesce(s.end_date,p_as_of) and v.status not in ('closed'))::int planned_by_sprint_end,
+      coalesce(round(100.0*count(v.id) filter(where v.status='closed')/nullif(count(v.id),0),1),0) progress_percent
+    from public.sprints s
+    left join visible_tickets v on v.sprint_id=s.id
+    where s.workspace_id=p_workspace
+      and (s.status='active' or (p_as_of between coalesce(s.start_date,p_as_of) and coalesce(s.end_date,p_as_of)))
+    group by s.id,s.name,s.status,s.start_date,s.end_date
+    order by s.start_date desc nulls last
+    limit 3
+  ), module_rows as (
+    select m.id,m.module_key,m.name,m.color,
+      count(v.id)::int total_tickets,
+      coalesce(sum(v.weight),0)::numeric total_sp,
+      coalesce(round(sum(v.weight*v.progress)/nullif(sum(v.weight),0),1),0) progress_percent,
+      count(v.id) filter(where v.status='closed')::int closed
+    from public.ticket_modules m
+    left join visible_tickets v on v.module_id=m.id
+    where m.workspace_id=p_workspace and m.active
+    group by m.id,m.module_key,m.name,m.color
+    having count(v.id)>0
+    order by count(v.id) desc,m.name
+  ), totals as (
+    select count(*)::int total_tickets,
+      coalesce(sum(weight),0)::numeric total_sp,
+      coalesce(round(sum(weight*progress)/nullif(sum(weight),0),1),0) progress_percent,
+      count(*) filter(where status='closed')::int closed,
+      count(*) filter(where status='backlog')::int backlog,
+      count(*) filter(where due_date<p_as_of and status not in ('qa_passed','closed'))::int overdue,
+      count(*) filter(where due_date between p_as_of and week_end and status not in ('closed'))::int due_this_week,
+      count(*) filter(where private.ticket_has_open_blockers(id))::int blocked
+    from visible_tickets
+  )
+  select jsonb_build_object(
+    'as_of',p_as_of,
+    'week_end',week_end,
+    'workspace_id',p_workspace,
+    'workspace',(select jsonb_build_object('name',w.name,'slug',w.slug) from public.workspaces w where w.id=p_workspace),
+    'totals',(select to_jsonb(totals) from totals),
+    'products',coalesce((select jsonb_agg(to_jsonb(product_rows)) from product_rows),'[]'::jsonb),
+    'active_sprints',coalesce((select jsonb_agg(to_jsonb(sprint_rows)) from sprint_rows),'[]'::jsonb),
+    'modules',coalesce((select jsonb_agg(to_jsonb(module_rows)) from module_rows),'[]'::jsonb)
+  ) into result;
+  return result;
+end
+$$;
+notify pgrst,'reload schema';
+commit;
